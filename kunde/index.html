@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VFX Shot – Kostenübersicht</title>
+<style>
+  :root{
+    --bg:#0e1116; --panel:#171b22; --panel-2:#1e242d; --line:#2a313c;
+    --text:#e6eaf0; --muted:#9aa6b5; --accent:#5b9dff; --accent-2:#34d399;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:linear-gradient(180deg,#0b0e13,#0e1116 240px);
+    color:var(--text); line-height:1.45; padding:32px 18px 80px;
+  }
+  .wrap{max-width:680px;margin:0 auto}
+  h1{font-size:24px;margin:0 0 4px}
+  .sub{color:var(--muted);font-size:14px;margin-bottom:24px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin-bottom:18px}
+  .card h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 16px;font-weight:600}
+  .row{margin-bottom:20px}
+  .row:last-child{margin-bottom:0}
+  .lbl{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;font-size:14px}
+  .lbl .val{font-variant-numeric:tabular-nums;font-weight:600;color:var(--accent)}
+  input[type=range]{width:100%;height:6px;border-radius:6px;-webkit-appearance:none;appearance:none;background:var(--panel-2);outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--accent);border:3px solid #0e1116;box-shadow:0 0 0 1px var(--accent)}
+  input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--accent);border:3px solid #0e1116}
+  .toggle{display:flex;gap:8px}
+  .toggle button{flex:1;background:var(--panel-2);border:1px solid var(--line);color:var(--muted);padding:9px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;transition:.12s}
+  .toggle button.active{background:var(--accent);color:#06101f;border-color:var(--accent)}
+  .result{margin-top:18px;background:linear-gradient(135deg,#13251c,#0f1b16);border:1px solid #1f4534;border-radius:14px;padding:24px;text-align:center}
+  .result .big{font-size:46px;font-weight:700;color:var(--accent-2);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+  .result .cap{color:var(--muted);font-size:13px;margin-top:6px}
+  .result .cfg{color:var(--text);font-size:13px;margin-top:10px;opacity:.85}
+  .hint{font-size:12px;color:var(--muted);margin-top:6px}
+  .reset{background:none;border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer}
+  .reset:hover{border-color:var(--accent);color:var(--text)}
+  .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;gap:12px}
+  #chart{width:100%;display:block;height:300px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div>
+      <h1>VFX Shot – Kostenübersicht</h1>
+      <div class="sub">Richtwert je nach Shot-Umfang</div>
+    </div>
+    <button class="reset" id="reset">Beispiel-Shot</button>
+  </div>
+
+  <div class="card">
+    <h2>Shot anpassen</h2>
+
+    <div class="row">
+      <div class="lbl"><span>Zu bearbeitende Gesichter</span><span class="val" id="facesVal">10</span></div>
+      <input type="range" id="faces" min="1" max="60" step="1" value="10">
+    </div>
+
+    <div class="row">
+      <div class="lbl"><span>Länge (Frames)</span><span class="val" id="framesVal">125</span></div>
+      <input type="range" id="frames" min="1" max="1000" step="1" value="125">
+      <div class="hint" id="secHint"></div>
+    </div>
+
+    <div class="row">
+      <div class="lbl"><span>Kamera-Bewegung</span></div>
+      <div class="toggle">
+        <button id="camLocked" class="active" data-cam="0">Locked-Off</button>
+        <button id="camLight" data-cam="1">Leichte Bew.</button>
+        <button id="camComplex" data-cam="2">Komplexer Move</button>
+      </div>
+    </div>
+
+    <div class="result">
+      <div class="big" id="cost">1.800 €</div>
+      <div class="cap">geschätzte Shot-Kosten (Richtwert, unverbindlich)</div>
+      <div class="cfg" id="cfg"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+      <h2 style="margin:0">Kostenverlauf</h2>
+      <div class="toggle" style="max-width:260px">
+        <button id="axisFrames" class="active" data-axis="frames">über Länge</button>
+        <button id="axisFaces" data-axis="faces">über Gesichter</button>
+      </div>
+    </div>
+    <canvas id="chart" height="300"></canvas>
+    <div class="hint" id="chartHint"></div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+/* === Feste Kalkulationswerte (nicht in der Oberfläche editierbar) === */
+const P = {
+  base: 1800, baseFaces: 10, baseFrames: 125, fps: 25,
+  minTotal: 800, midFaces: 4, costMid: 1200,
+  kFaces: 1.2, kFrames: 0.45, kFlat: 0.15, kFloor: 0.85,
+  camFactors: [1, 1.3, 1.85]
+};
+const camLabels = ['Locked-Off (statisch)','Leichte Bewegung','Komplexer Move'];
+let camLevel = 0;
+let xAxis = 'frames';
+
+const fmtEur = n => new Intl.NumberFormat('de-DE',{maximumFractionDigits:0}).format(Math.round(n)) + ' €';
+
+// Längen-Faktor (Abflachung nach oben, Untergrenze nach unten)
+function lengthFactor(frames){
+  const u = Math.log(frames / P.baseFrames);
+  if (u > 0){
+    return (P.kFlat === 0) ? Math.pow(frames / P.baseFrames, P.kFrames)
+                           : Math.exp(P.kFrames * u / (1 + P.kFlat * u));
+  } else if (P.kFloor <= 0){
+    return Math.pow(frames / P.baseFrames, P.kFrames);
+  } else {
+    const a = P.kFrames / (1 - P.kFloor);
+    return P.kFloor + (1 - P.kFloor) * Math.exp(a * u);
+  }
+}
+
+// Gesichter-Faktor (Stützpunkt-Kurve unter Anker, Potenzgesetz darüber)
+function facesFactor(faces){
+  if (faces >= P.baseFaces) return Math.pow(faces / P.baseFaces, P.kFaces);
+  const x0 = 1, y0 = P.minTotal, x2 = P.baseFaces, y2 = P.base;
+  const x1 = P.midFaces, y1 = P.costMid;
+  const valid = x1 > x0 && x1 < x2 && y1 > 0;
+  let cost;
+  if (!valid) cost = y0 + (faces - x0) * (y2 - y0) / (x2 - x0);
+  else if (faces <= x1) cost = y0 + (faces - x0) * (y1 - y0) / (x1 - x0);
+  else cost = y1 + (faces - x1) * (y2 - y1) / (x2 - x1);
+  return cost / P.base;
+}
+
+function costFor(faces, frames, camIdx){
+  const raw = P.base * facesFactor(faces) * lengthFactor(frames) * P.camFactors[camIdx];
+  return Math.max(P.minTotal, raw);
+}
+
+function calc(){
+  const faces  = +$('faces').value;
+  const frames = +$('frames').value;
+  $('facesVal').textContent = faces;
+  $('framesVal').textContent = frames;
+  $('secHint').textContent = '≈ ' + (frames/P.fps).toLocaleString('de-DE',{maximumFractionDigits:1}) + ' s';
+
+  $('cost').textContent = fmtEur(costFor(faces, frames, camLevel));
+  $('cfg').textContent = `${faces} Gesicht${faces===1?'':'er'} · ${frames} Frames · ${camLabels[camLevel]}`;
+  drawChart();
+}
+
+// Kamera-Presets
+const camBtns = [$('camLocked'),$('camLight'),$('camComplex')];
+camBtns.forEach((btn,i)=>btn.addEventListener('click',()=>{
+  camLevel=i; camBtns.forEach((b,j)=>b.classList.toggle('active', i===j)); calc();
+}));
+['faces','frames'].forEach(id => $(id).addEventListener('input', calc));
+$('reset').addEventListener('click',()=>{
+  $('faces').value=10; $('frames').value=125;
+  camLevel=0; camBtns.forEach((b,j)=>b.classList.toggle('active', j===0));
+  calc();
+});
+
+// ---------------- Graph ----------------
+const chart = $('chart');
+const ctx = chart.getContext('2d');
+
+function drawChart(){
+  const faces  = +$('faces').value;
+  const frames = +$('frames').value;
+
+  const cssW = chart.clientWidth || chart.parentElement.clientWidth - 44;
+  const cssH = 300, dpr = window.devicePixelRatio || 1;
+  chart.width = cssW * dpr; chart.height = cssH * dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,cssW,cssH);
+
+  const padL=64, padR=18, padT=16, padB=40;
+  const plotW = cssW - padL - padR, plotH = cssH - padT - padB;
+
+  const onFrames = xAxis === 'frames';
+  const xMin = 1;
+  const xMax = onFrames ? (+$('frames').max || 1000) : (+$('faces').max || 60);
+  const curX = onFrames ? frames : faces;
+  const yOf = x => onFrames ? costFor(faces, x, camLevel) : costFor(x, frames, camLevel);
+
+  const N = 160; const pts = []; let yMax = 0;
+  for (let i=0;i<=N;i++){
+    const x = xMin + (xMax-xMin)*i/N; const y = yOf(x);
+    pts.push([x,y]); if (y>yMax) yMax=y;
+  }
+  yMax = yMax*1.08 || 1; const yMin = 0;
+  const sx = x => padL + (x-xMin)/(xMax-xMin)*plotW;
+  const sy = y => padT + plotH - (y-yMin)/(yMax-yMin)*plotH;
+
+  ctx.font = '11px -apple-system,Segoe UI,Roboto,sans-serif'; ctx.textBaseline='middle';
+  for (let i=0;i<=5;i++){
+    const y = yMin + (yMax-yMin)*i/5; const py = sy(y);
+    ctx.strokeStyle='#2a313c'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(padL,py); ctx.lineTo(padL+plotW,py); ctx.stroke();
+    ctx.fillStyle='#9aa6b5'; ctx.textAlign='right'; ctx.fillText(fmtEur(y), padL-8, py);
+  }
+  ctx.textAlign='center'; ctx.textBaseline='top';
+  for (let i=0;i<=5;i++){
+    const x = xMin + (xMax-xMin)*i/5; ctx.fillStyle='#9aa6b5';
+    ctx.fillText(Math.round(x), sx(x), padT+plotH+8);
+  }
+  ctx.fillStyle='#9aa6b5'; ctx.fillText(onFrames ? 'Frames' : 'Gesichter', padL+plotW/2, padT+plotH+22);
+
+  ctx.beginPath();
+  pts.forEach((pt,i)=>{ const X=sx(pt[0]), Y=sy(pt[1]); i?ctx.lineTo(X,Y):ctx.moveTo(X,Y); });
+  ctx.strokeStyle='#5b9dff'; ctx.lineWidth=2.5; ctx.lineJoin='round'; ctx.stroke();
+  ctx.lineTo(sx(pts[pts.length-1][0]), sy(0)); ctx.lineTo(sx(pts[0][0]), sy(0)); ctx.closePath();
+  ctx.fillStyle='rgba(91,157,255,0.10)'; ctx.fill();
+
+  const cy = yOf(curX), px = sx(curX), py = sy(cy);
+  ctx.strokeStyle='rgba(52,211,153,0.5)'; ctx.lineWidth=1; ctx.setLineDash([4,4]);
+  ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(px,sy(0)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(padL,py); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.beginPath(); ctx.arc(px,py,6,0,Math.PI*2);
+  ctx.fillStyle='#34d399'; ctx.fill(); ctx.strokeStyle='#0e1116'; ctx.lineWidth=2; ctx.stroke();
+
+  const lbl = fmtEur(cy);
+  ctx.font='600 12px -apple-system,Segoe UI,Roboto,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='bottom';
+  const lw = ctx.measureText(lbl).width;
+  let lx = Math.max(padL+lw/2+4, Math.min(padL+plotW-lw/2-4, px)); const ly = py-12;
+  ctx.fillStyle='rgba(14,17,22,0.85)'; ctx.fillRect(lx-lw/2-6, ly-16, lw+12, 18);
+  ctx.fillStyle='#34d399'; ctx.fillText(lbl, lx, ly);
+
+  $('chartHint').textContent = onFrames
+    ? `Kosten über die Shot-Länge bei ${faces} Gesichtern · ${camLabels[camLevel]}.`
+    : `Kosten über die Anzahl Gesichter bei ${frames} Frames · ${camLabels[camLevel]}.`;
+}
+
+[$('axisFrames'),$('axisFaces')].forEach(btn=>btn.addEventListener('click',()=>{
+  xAxis = btn.dataset.axis;
+  $('axisFrames').classList.toggle('active', xAxis==='frames');
+  $('axisFaces').classList.toggle('active', xAxis==='faces');
+  drawChart();
+}));
+window.addEventListener('resize', drawChart);
+
+calc();
+</script>
+</body>
+</html>
