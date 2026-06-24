@@ -167,11 +167,21 @@
       <div class="hint" style="margin-top:-6px">Shot-Kosten fallen nie unter diesen Sockel (Grundaufwand). <code>0</code> = kein Mindestpreis.</div>
 
       <h2 style="margin-top:26px">Schwierigkeits-Faktoren</h2>
-      <div class="row">
+      <div class="row twocol">
         <div class="field">
-          <label>Gesichter-Exponent (Standard 1,20)</label>
+          <label>Gesichter-Stützpunkt (Anzahl)</label>
+          <input class="num" type="number" id="midFaces" value="4" step="1" min="2">
+        </div>
+        <div class="field">
+          <label>Preis am Stützpunkt (€)</label>
+          <input class="num" type="number" id="costMid" value="1200" step="50">
+        </div>
+        <div class="field" style="grid-column:1 / -1">
+          <label>Gesichter-Exponent über Anker (Standard 1,20)</label>
           <input class="num" type="number" id="kFaces" value="1.2" step="0.05">
-          <div class="hint">Kosten ×&nbsp;<code>(Gesichter / Anker)^Exponent</code></div>
+        </div>
+        <div class="field" style="grid-column:1 / -1">
+          <div class="hint"><b>Unter Anker:</b> 1 Gesicht = Mindestpreis → Stützpunkt → Anker (linear). <b>Über Anker:</b> Kosten ×&nbsp;<code>(Gesichter/Anker)^Exponent</code>.</div>
         </div>
       </div>
       <div class="row twocol">
@@ -247,8 +257,31 @@ function readParams(){
     kFlat:      Math.max(0, +$('kFlat').value || 0),
     kFloor:     Math.min(0.999, Math.max(0, +$('kFloor').value || 0)),
     minTotal:   Math.max(0, +$('minTotal').value || 0),
+    midFaces:   +$('midFaces').value || 4,
+    costMid:    +$('costMid').value || 0,
     camFactors: [ +$('kCamLocked').value || 1, +$('kCamLight').value || 1, +$('kCamComplex').value || 1 ]
   };
+}
+
+// Gesichter-Faktor:
+//  - bis zum Anker: geformte Kurve durch (1 Gesicht = Mindestpreis), (Stützpunkt), (Anker = Basis)
+//  - über dem Anker: überproportionales Potenzgesetz (Exponent kFaces)
+function facesFactor(faces, p){
+  if (faces >= p.baseFaces) return Math.pow(faces / p.baseFaces, p.kFaces);
+  const x0 = 1,            y0 = p.minTotal;          // 1 Gesicht  -> Mindestpreis
+  const x2 = p.baseFaces,  y2 = p.base;              // Anker      -> Basis-Kosten
+  let x1 = p.midFaces,     y1 = p.costMid;           // Stützpunkt
+  // Stützpunkt absichern (muss zwischen 1 und Anker liegen)
+  const valid = x1 > x0 && x1 < x2 && y1 > 0;
+  let cost;
+  if (!valid){
+    cost = y0 + (faces - x0) * (y2 - y0) / (x2 - x0);          // einfache Gerade als Fallback
+  } else if (faces <= x1){
+    cost = y0 + (faces - x0) * (y1 - y0) / (x1 - x0);
+  } else {
+    cost = y1 + (faces - x1) * (y2 - y1) / (x2 - x1);
+  }
+  return cost / p.base;
 }
 
 // Längen-Faktor (mit Abflachung nach oben, Untergrenze nach unten)
@@ -267,7 +300,7 @@ function lengthFactor(frames, p){
 
 // Vollständige Kostenrechnung für beliebige Gesichter/Frames/Kamera
 function costFor(faces, frames, camIdx, p){
-  const fFaces  = Math.pow(faces / p.baseFaces, p.kFaces);
+  const fFaces  = facesFactor(faces, p);
   const fFrames = lengthFactor(frames, p);
   const fCam    = p.camFactors[camIdx];
   const raw     = p.base * fFaces * fFrames * fCam;
@@ -426,11 +459,11 @@ camBtns.forEach((btn,i)=>btn.addEventListener('click',()=>{
 }));
 
 // Alle Eingaben live
-['faces','frames','base','baseFaces','baseFrames','fps','minTotal','kFaces','kFrames','kFlat','kFloor','kCamLocked','kCamLight','kCamComplex']
+['faces','frames','base','baseFaces','baseFrames','fps','minTotal','midFaces','costMid','kFaces','kFrames','kFlat','kFloor','kCamLocked','kCamLight','kCamComplex']
   .forEach(id => $(id).addEventListener('input', calc));
 
 // Reset
-const defaults = {faces:10,frames:125,base:1800,baseFaces:10,baseFrames:125,fps:25,minTotal:800,kFaces:1.2,kFrames:0.45,kFlat:0.15,kFloor:0.85,kCamLocked:1,kCamLight:1.3,kCamComplex:1.85};
+const defaults = {faces:10,frames:125,base:1800,baseFaces:10,baseFrames:125,fps:25,minTotal:800,midFaces:4,costMid:1200,kFaces:1.2,kFrames:0.45,kFlat:0.15,kFloor:0.85,kCamLocked:1,kCamLight:1.3,kCamComplex:1.85};
 $('reset').addEventListener('click',()=>{
   for(const k in defaults) $(k).value = defaults[k];
   camLevel=0;camBtns.forEach((b,j)=>b.classList.toggle('active', j===0));
