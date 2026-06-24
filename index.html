@@ -163,8 +163,8 @@
       <h2 style="margin-top:26px">Schwierigkeits-Faktoren</h2>
       <div class="row">
         <div class="field">
-          <label>Gesichter-Exponent (Standard 1,15)</label>
-          <input class="num" type="number" id="kFaces" value="1.15" step="0.05">
+          <label>Gesichter-Exponent (Standard 1,20)</label>
+          <input class="num" type="number" id="kFaces" value="1.2" step="0.05">
           <div class="hint">Kosten ×&nbsp;<code>(Gesichter / Anker)^Exponent</code></div>
         </div>
       </div>
@@ -418,7 +418,7 @@ camBtns.forEach((btn,i)=>btn.addEventListener('click',()=>{
   .forEach(id => $(id).addEventListener('input', calc));
 
 // Reset
-const defaults = {faces:10,frames:125,base:1800,baseFaces:10,baseFrames:125,fps:25,kFaces:1.15,kFrames:0.45,kFlat:0.15,kFloor:0.85,kCamLocked:1,kCamLight:1.3,kCamComplex:1.85};
+const defaults = {faces:10,frames:125,base:1800,baseFaces:10,baseFrames:125,fps:25,kFaces:1.2,kFrames:0.45,kFlat:0.15,kFloor:0.85,kCamLocked:1,kCamLight:1.3,kCamComplex:1.85};
 $('reset').addEventListener('click',()=>{
   for(const k in defaults) $(k).value = defaults[k];
   camLevel=0;camBtns.forEach((b,j)=>b.classList.toggle('active', j===0));
